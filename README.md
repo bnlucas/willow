@@ -124,21 +124,17 @@ def deserialize_uuid(s: str) -> UUID:
 @dataclass
 class Event(Serializable, Validated):
     event_id: UUID = field(
-        metadata={
-            "json": {"key": "id"},
-            "willow": {"serializer": serialize_uuid, "deserializer": deserialize_uuid}
-        }
+        json={"key": "id"},
+        willow={"serializer": serialize_uuid, "deserializer": deserialize_uuid},
     )
-    name: str = field(metadata={"json": {"key": "eventName"}})
+    name: str = field(json={"key": "eventName"})
     timestamp: datetime = field(
-        metadata={
-            "json": {"key": "ts"},
-            "willow": {"serializer": datetime.isoformat, "deserializer": datetime.fromisoformat}
-        }
+        json={"key": "ts"},
+        willow={"serializer": datetime.isoformat, "deserializer": datetime.fromisoformat},
     )
     internal_note: str = field(
         default="secret",
-        metadata={"willow": {"ignore": True}}
+        willow={"ignore": True}
     )
 ```
 
