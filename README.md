@@ -1,55 +1,78 @@
 # Willow
 
-**Willow** is a lightweight Python library that provides dataclass-focused utilities for serialization, deserialization, validation, and general object manipulation. It extends Python’s dataclass functionality with mixins and helper functions that simplify common tasks while keeping your data structures type-safe and consistent.
-
----
+**Willow** extends Python dataclasses with a collection of mixins and utilities designed for clean, efficient, and expressive data modeling. The library focuses on serialization, deserialization, validation, updates, comparison, and computed properties, making it ideal for API models, configuration objects, and internal data structures.
 
 ## Features
 
-- **Mixins for common behaviors**
-  - `Serializable`: Convert dataclasses to/from dictionaries or JSON with optional wrapper and inclusion rules.
-  - `Updatable`: Immutable-style copying and updating of dataclasses.
-  - `Validated`: Automatic field validation using metadata, with support for `allow_none` and exception-based validators.
-  - `Comparable`: Implements rich comparison methods based on field values.
-  - `Hashable`: Implements hash based on field values.
-  - `WillowMixin`: Base mixin providing `_asdict()` and `_fields` caching.
-  
-- **Custom Field Support**
-  - `willow.field`: Adds metadata options for validation, JSON serialization, default values, and more. Supports aliases, custom keys, serializers, deserializers, and ignoring fields.
+---
 
-- **Error Handling**
-  - `DeserializeError`: Raised during deserialization failures.
-  - `ValidationError`: Raised when a field fails validation.
-  - `WillowError`: Base exception for all Willow errors.
+### Mixins
 
+- **`WillowMixin`** – Core mixin providing cached `asdict()` results, field/property introspection, dirty tracking, and automatic cache invalidation when fields are updated. Improves performance and simplifies reflective operations.
 
-- **Flexible Serialization**
-  - JSON serialization with custom wrappers and inclusion rules (`Include` enum).
-    - `ALWAYS`: Always include the field.
-    - `NON_NULL`: Include only if the value is not `None`.
-    - `NON_DEFAULT`: Include only if the value differs from the field's default.
-  - Field-level control over serialization keys, aliases, and custom serializers.
-  - Supports serialization of nested dataclasses, lists, tuples, dictionaries, enums, UUIDs, and datetime objects.
+- **`Serializable`** – Adds flexible serialization to dicts or JSON, including support for computed properties and nested dataclasses. Inclusion rules (`Include` enum) allow fine-grained control over which fields are included, e.g., omit `None` values or empty collections.
 
-- **Type-Safe Deserialization**
-  - Converts JSON or dicts into dataclass instances while respecting type hints.
-  - Handles nested dataclasses, lists, tuples, dictionaries, enums, UUIDs, and datetime objects.
-  - Optional field support for `Union[..., None]`.
-  - Supports deserialization of nested dataclasses, lists, tuples, dictionaries, enums, UUIDs, and datetime objects.
+- **`Updatable`** – Enables immutable-like copying and updating via `copy()`, `update()`, and `batch_update()`. `batch_update()` temporarily disables validation, which is useful when performing multiple updates at once.
+
+- **`Validated`** – Automatic validation for fields based on metadata (`validator` and `allow_none`). Raises `ValidationError` when constraints are violated. Ensures data integrity without verbose boilerplate.
+
+- **`Comparable`** – Provides rich comparison operators (`==`, `<`, `>`, etc.) based on field values, allowing objects to be sorted or compared naturally.
+
+- **`Hashable`** – Computes hash values based on field values, enabling usage as keys in dictionaries or members of sets.
+
+- **`HooksMixin`** – Provides `_on_field_update` and `_on_validation` hooks triggered during field updates or validation. Useful for side effects such as logging or change tracking.
+
+---
+
+### Field Utilities
+
+- **`willow.field`** – Dataclass field wrapper supporting validation, default values, serialization aliases, ignoring, and custom (de)serializers. Makes it easy to define fields with rich metadata.
+
+- **`@willow_property`** – Marks computed properties for inclusion in serialization (`to_dict` / `to_json`). Fully supports `@x.setter` and `@x.deleter` syntax and allows custom serialization logic through metadata.
+
+---
+
+### Flexible Serialization
+
+- **Inclusion Rules** – Control which members are serialized using the `Include` enum:  
+  - `ALWAYS`: Include all members.  
+  - `NON_NONE`: Include only members that are not `None`.  
+  - `NON_EMPTY`: Include only non-empty members (`''`, `[]`, `{}`).  
+  - `NON_DEFAULT`: Include members whose value differs from the default (fields only; cannot be used with computed properties).  
+
+- **Nested Support** – Automatically handles nested dataclasses, lists, tuples, dicts, enums, UUIDs, and datetime objects.  
+
+- **Custom Serialization** – Per-field or per-property serializers allow transforming values before they are emitted as dicts or JSON.
+
+---
+
+### Deserialization
+
+- Create dataclass instances from dicts or JSON.  
+- Supports nested dataclasses, optional fields, and type-safe conversion.  
+- Fields marked `willow.ignore=True` are skipped.  
+
+---
+
+### Error Handling
+
+- **`ValidationError`** – Raised when a field fails validation.  
+- **`DeserializeError`** – Raised on deserialization failure.  
+- **`WillowError`** – Base exception class for all Willow errors.
+
+---
 
 ---
 
 ## Installation
 
-Install the latest release from PyPI:
-
-```python
+```bash
 pip install willow
 ```
 
-Or install directly from the GitHub repository:
+or
 
-```python
+```bash
 pip install git+https://github.com/bnlucas/willow.git
 ```
 
@@ -57,162 +80,80 @@ pip install git+https://github.com/bnlucas/willow.git
 
 ## Usage
 
-### Defining a Dataclass with Willow
+### Basic dataclass with validation and serialization
 
 ```python
 from dataclasses import dataclass
-from willow import field, Serializable, Validated, Updatable
+from willow import field, Serializable, Validated, Updatable, willow_property
 
 @dataclass
 class User(Serializable, Validated, Updatable):
     id: int = field()
     name: str = field(validator=lambda x: len(x) > 0)
     email: str = field(default="")
+
+    @willow_property(json={"key": "displayName"})
+    def display_name(self) -> str:
+        return f"{self.name} <{self.email}>"
+
+user = User(id=1, name="Alice", email="alice@nullmailer.com")
+print(user.to_dict())
+# {'id': 1, 'name': 'Alice', 'email': 'alice@nullmailer.com', 'display_name': 'Alice <alice@nullmailer.com>'}
+print(user.to_json())
+# '{"id": 1, "name": "Alice", "email": "alice@nullmailer.com", 'displayName': 'Alice <alice@nullmailer.com>'}'
 ```
 
 ---
 
-### Serialization & Deserialization
-
-Class-level wrapper and inclusion:
+### Serialization with inclusion rules
 
 ```python
-from dataclasses import dataclass
-from willow import Serializable, Include, field
+from willow import Include
 
 @dataclass
-class User(Serializable):
-    __json_wrapper__ = "user"
-    __inclusion__ = Include.NON_NULL
+class Product(Serializable):
+    __json_wrapper__ = "product"
+    __inclusion__ = Include.NON_NONE
 
     id: int
-    name: str | None
-    email: str | None = None
+    name: str
+    description: str | None = None
 
-user = User(id=1, name="Alice", email=None)
-
-print(user.to_json())
-# {"user": {"id": 1, "name": "Alice"}}
-```
-
-Per-call overrides:
-
-```python
-json_str = user.to_json(wrapper="member", include=Include.ALWAYS)
-print(json_str)
-# {"member": {"id": 1, "name": "Alice", "email": null}}
-```
-
----
-
-### Field Metadata with `willow.field`
-
-Custom keys, aliases, serializers, deserializers, and ignoring fields:
-
-```python
-from dataclasses import dataclass
-from datetime import datetime
-from uuid import UUID
-from willow import Serializable, Validated, field
-
-def serialize_uuid(u: UUID) -> str:
-    return str(u).replace("-", "")
-
-def deserialize_uuid(s: str) -> UUID:
-    return UUID(s)
-
-@dataclass
-class Event(Serializable, Validated):
-    event_id: UUID = field(
-        json={"key": "id"},
-        willow={"serializer": serialize_uuid, "deserializer": deserialize_uuid},
-    )
-    name: str = field(json={"key": "eventName"})
-    timestamp: datetime = field(
-        json={"key": "ts"},
-        willow={"serializer": datetime.isoformat, "deserializer": datetime.fromisoformat},
-    )
-    internal_note: str = field(
-        default="secret",
-        willow={"ignore": True}
-    )
+p = Product(id=1, name="Widget")
+print(p.to_json())
+# {"product": {"id": 1, "name": "Widget"}}
 ```
 
 ---
 
 ### Validation
 
-Validators return `bool` or raise. If `allow_none=True` and value is `None`, validation is skipped.
-
 ```python
-from dataclasses import dataclass
-from willow import Validated, ValidationError, field
-
-@dataclass
-class User(Validated):
-    id: int
-    name: str = field(validator=lambda x: bool(x), allow_none=False)
-    nickname: str | None = field(
-        validator=lambda x: len(x) > 1 if x else True, allow_none=True
-    )
-
-# Valid instance
-user = User(id=1, name="Alice", nickname=None)
-
-# Invalid: name empty
 try:
     User(id=2, name="")
 except ValidationError as e:
     print(e.field.name, e.value)
-
-# Invalid: nickname too short
-try:
-    User(id=3, name="Bob", nickname="A")
-except ValidationError as e:
-    print(e.field.name, e.value)
+# name ''
 ```
 
 ---
 
-### Quick Reference: `willow.field`
-
-| Argument / Metadata | Description | Notes |
-|--------------------|------------|------|
-| `default` | Default value if not provided | Standard dataclass behavior |
-| `default_factory` | Callable to produce default | Standard dataclass behavior |
-| `validator` | Callable returning `bool` or raising exception | Used by `Validated` mixin |
-| `allow_none` | Skip validation if value is `None` | Only relevant for `Validated` |
-| `json.key` | Custom key for (de)serialization | Overrides field name in dict/JSON |
-| `json.aliases` | List of alternative keys to accept on input | Used in deserialization |
-| `willow.serializer` | Callable to transform field during serialization | e.g., UUID → str |
-| `willow.deserializer` | Callable to transform field during deserialization | e.g., str → UUID |
-| `willow.ignore` | Boolean to omit field in (de)serialization | Defaults to `False` |
-
----
-
-### Updating & Copying
+### Updating & copying
 
 ```python
-from dataclasses import dataclass
-from willow import Updatable, field
+user2 = user.update(name="Bob")
+print(user2)
+# User(id=1, name='Bob', email='')
 
-@dataclass
-class User(Updatable):
-    id: int
-    name: str
-
-user = User(id=1, name="Alice")
-updated_user = user.update(name="Bob")
-print(updated_user)
-# Output: User(id=1, name='Bob')
+with user.batch_update() as u:
+    u.name = "Charlie"  # temporarily disables validation
 ```
 
 ---
 
-### Comparison & Hashing
+### Comparison & hashing
 
 ```python
-from dataclasses import dataclass
 from willow import Comparable, Hashable
 
 @dataclass
@@ -229,39 +170,62 @@ print(hash(user1))
 
 ---
 
-## Enums
+### Working with properties
 
-- `Include`: Controls which fields are included during serialization.
-  - `ALWAYS`: Always include the field.
-  - `NON_NULL`: Include only if the value is not `None`.
-  - `NON_DEFAULT`: Include only if the value differs from the field's default.
+```python
+@dataclass
+class Config(Serializable):
+    x: int
+    y: int
 
-## Errors
+    @willow_property
+    def sum(self) -> int:
+        return self.x + self.y
 
-- `WillowError`
-- `ValidationError`
-- `DeserializeError`
+c = Config(x=2, y=3)
+print(c.to_dict())
+# {'x': 2, 'y': 3, 'sum': 5}
+```
 
-## Mixins
+---
 
-- `WillowMixin`
-- `Serializable`
-- `Updatable`
-- `Validated`
-- `Comparable`
-- `Hashable`
+### Handling private fields
+
+By default, fields and properties starting with `_` are considered private and excluded from serialization. Use `include_private=True` to include them in `asdict()` / `to_dict()` output.
+
+---
+
+### Include enum
+
+- `ALWAYS`: Include all members
+- `NON_NONE`: Exclude members that are `None`
+- `NON_EMPTY`: Exclude members that are empty (`''`, `[]`, `{}`)
+- `NON_DEFAULT`: Exclude members equal to the default value
+
+---
+
+## Mixins Overview
+
+- **WillowMixin** – Core caching, dirty field tracking, field/property introspection.
+- **Serializable** – Dict/JSON serialization with wrappers and inclusion rules.
+- **Updatable** – Copy/update utilities and `batch_update` context.
+- **Validated** – Automatic validation using field metadata.
+- **Comparable** – Rich comparison operators based on field values.
+- **Hashable** – Hash based on field values.
+- **HooksMixin** – Automatic hook invocation on field updates and validation.
+- **@willow_property** – Mark computed properties to include during serialization.
 
 ---
 
 ## Contributing
 
 1. Fork the [repository](https://github.com/bnlucas/willow)
-2. Create a branch  
-3. Add tests  
-4. Submit a pull request  
+2. Create a branch
+3. Add tests
+4. Submit a pull request
 
 ---
 
 ## License
 
-`willow` is distributed under the MIT license. See the [LICENSE](https://github.com/bnlucas/willow/blob/main/LICENSE) file for details.
+MIT License. See [LICENSE](https://github.com/bnlucas/willow/blob/main/LICENSE).

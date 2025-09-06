@@ -4,18 +4,19 @@ from dataclasses import fields, MISSING
 from dataclasses import Field  # noqa: F401
 from typing import Any, get_type_hints, TYPE_CHECKING
 
+from ..errors import DeserializeError
 from ._deserialize_field import deserialize_field
 from ._is_required import is_required
-from ..errors import DeserializeError
+from ._willow_metadata import willow_metadata
 
 if TYPE_CHECKING:
-    from ..protocols import DataclassInstance
+    from ..protocols import WillowDataclass
 
 
 def from_dict(
-    cls: type[DataclassInstance],
+    cls: type[WillowDataclass],
     data: dict[str, Any],
-) -> DataclassInstance:
+) -> WillowDataclass:
     """
     Deserialize a dictionary into a dataclass instance.
 
@@ -32,9 +33,7 @@ def from_dict(
     kwargs = dict()
 
     for field in fields(cls):
-        cfg = field.metadata.get("willow", {})
-
-        if cfg.get("ignore", False):
+        if willow_metadata(field, "ignore", False):
             continue
 
         if field.name in data:

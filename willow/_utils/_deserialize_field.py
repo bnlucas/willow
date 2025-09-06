@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING
 
 from ..errors import DeserializeError
 from ._deserialize_value import deserialize_value
+from ._willow_metadata import willow_metadata
 
 if TYPE_CHECKING:
     from dataclasses import Field
@@ -28,7 +29,7 @@ def deserialize_field(
     :raises DeserializeError: If deserialization fails for the field.
     :return: Deserialized value for the field.
     """
-    deserializer = field.metadata.get("willow", {}).get("deserializer")
+    deserializer = willow_metadata(field, "deserializer")
 
     try:
         value = data[field.name]

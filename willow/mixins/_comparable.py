@@ -10,7 +10,7 @@ class Comparable(WillowMixin):
     """
     Mixin for dataclasses that provides comparison operations based on field values.
 
-    Uses `_asdict()` to compare instances. Supports equality and ordering.
+    Uses `asdict()` to compare instances. Supports equality and ordering.
     """
 
     def __eq__(
@@ -28,7 +28,7 @@ class Comparable(WillowMixin):
         if not isinstance(other, type(self)):
             return NotImplemented
 
-        return self._asdict() == other._asdict()
+        return self.asdict() == other.asdict()
 
     def __lt__(
         self,
@@ -45,7 +45,7 @@ class Comparable(WillowMixin):
         if not isinstance(other, type(self)):
             return NotImplemented
 
-        return tuple(self._asdict().values()) < tuple(other._asdict().values())
+        return tuple(self.asdict().values()) < tuple(other.asdict().values())
 
 
 __all__ = ("Comparable",)

@@ -1,54 +1,117 @@
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from ..errors import ValidationError
+from .._utils import willow_metadata
 from ._willow import WillowMixin
+
+if TYPE_CHECKING:
+    from dataclasses import Field
+    from typing import Any
 
 
 class Validated(WillowMixin):
     """
-    Mixin for dataclasses that validates fields after initialization.
+    Mixin for dataclasses that performs automatic validation of fields.
 
-    Uses validators defined in field metadata to ensure values are valid.
-    Raises `ValidationError` if any field fails validation.
+    Uses validator functions defined in field metadata under the key 'validator'.
+    Fields may optionally allow `None` values if 'allow_none' is True.
+    Raises `ValidationError` if validation fails.
     """
 
     def __post_init__(self):
         """
-        Perform validation on all fields of the dataclass after initialization.
+        Validate all fields after dataclass initialization.
 
-        Checks each field's value against a validator function defined in
-        the field's metadata under the key 'validator'. Fields with `None`
-        values are allowed if 'allow_none' is set to True in metadata.
+        Iterates through all fields and validates their values using the
+        associated validator from metadata. Skips validation for fields
+        with `None` values if 'allow_none' is True.
 
-        :raises ValidationError: If any field fails validation or the validator
-                raises an exception.
+        :raises ValidationError: If a field fails validation or the validator raises
+                an exception.
         """
         for field in self._fields:
             value = getattr(self, field.name)
-            allow_none = field.metadata.get("allow_none", False)
+            self._validate_field(field, value)
 
-            if value is None and allow_none:
-                continue
+    def _on_field_update(
+        self,
+        field: Field,
+        value: Any,
+        old_value: Any,
+    ) -> None:
+        """
+        Validate a field whenever its value is updated.
 
-            validator = field.metadata.get("validator")
+        :param field: The dataclass field being updated.
+        :param value: The new value assigned to the field.
+        :param old_value: The previous value of the field.
+        """
+        self._validate_field(field, value)
 
-            if callable(validator):
-                try:
-                    is_validated = validator(value)
+    def _on_validation(
+        self,
+        field: Field,
+        value: Any,
+        *,
+        error: tuple[str, Exception | None] | None = None,
+    ) -> None:
+        """
+        Hook called when a validation error occurs.
 
-                    if not is_validated:
-                        raise ValidationError(
-                            f"Validation failed for field '{field.name}'",
-                            field=field,
-                            value=value,
-                        )
-                except Exception as e:
-                    raise ValidationError(
-                        f"Validation failed for field '{field.name}'",
-                        field=field,
-                        value=value,
-                        error=e,
-                    ) from e
+        Raises `ValidationError` with the provided message and field info.
+
+        :param field: The dataclass field being validated.
+        :param value: The value that failed validation.
+        :param error: Tuple containing error message and optional exception.
+        """
+        if error:
+            message, exception = error
+
+            raise ValidationError(
+                message=message,
+                field=field,
+                value=value,
+                error=exception,
+            )
+
+    def _validate_field(
+        self,
+        field: Field,
+        value: Any,
+    ) -> None:
+        """
+        Perform validation on a single field.
+
+        Skips validation if `_willow_validation` is False.
+        Uses the validator from field metadata. If `allow_none` is True
+        and the value is None, validation is skipped.
+
+        :param field: The dataclass field to validate.
+        :param value: The value to validate.
+        """
+        if not self._willow_validation:
+            return
+
+        error: tuple[str, Exception | None] | None = None
+        metadata = willow_metadata(field)
+        allow_none = metadata.get("allow_none", False)
+        validator = metadata.get("validator")
+
+        try:
+            if (value is None and allow_none) or validator is None:
+                return
+
+            try:
+                is_validated = validator(value)
+
+                if not is_validated:
+                    error = (f"Validation failed for field '{field.name}'", None)
+            except Exception as e:
+                error = (f"Validation failed for field '{field.name}'", e)
+        finally:
+            self._willow_hook("_on_validation", field, value, error=error)
 
 
 __all__ = ("Validated",)

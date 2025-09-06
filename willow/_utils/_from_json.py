@@ -12,11 +12,11 @@ if TYPE_CHECKING:
     from json import JSONDecoder
     from typing import Any, Callable, Type
 
-    from ..protocols import DataclassInstance
+    from ..protocols import WillowDataclass
 
 
 def from_json(
-    cls: type[DataclassInstance],
+    cls: type[WillowDataclass],
     s: str | bytes | bytearray,
     *,
     wrapper: str | None = None,
@@ -26,7 +26,7 @@ def from_json(
     parse_int: Callable[[str], Any] | None = None,
     parse_constant: Callable[[str], Any] | None = None,
     object_hook_pairs: Callable[[list[tuple[Any, Any]]], Any] | None = None,
-) -> DataclassInstance:
+) -> WillowDataclass:
     """
     Deserialize a JSON string or bytes into a dataclass instance.
 

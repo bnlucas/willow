@@ -7,14 +7,16 @@ class Include(Enum):
     """
     Enum specifying inclusion rules for serialization.
 
-    - NON_NULL: Include fields that are not None.
-    - NON_DEFAULT: Include fields that differ from their default value.
-    - ALWAYS: Always include fields.
+    - ALWAYS: Include all members.
+    - NON_NONE: Include members that are not None.
+    - NON_EMPTY: Include members that are not empty (e.g., '', [], {}).
+    - NON_DEFAULT: Include members whose value differs from the default.
     """
 
-    NON_NULL = auto()
-    NON_DEFAULT = auto()
     ALWAYS = auto()
+    NON_NONE = auto()
+    NON_EMPTY = auto()
+    NON_DEFAULT = auto()
 
 
 __all__ = ("Include",)

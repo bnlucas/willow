@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from ._dataclass import DataclassInstance
+from ._dataclass import WillowDataclass
+from ._hooks import HooksProtocol
+from ._member import MemberCaptureProtocol
 
 
-__all__ = ("DataclassInstance",)
+__all__ = ("WillowDataclass", "HooksProtocol", "MemberCaptureProtocol")

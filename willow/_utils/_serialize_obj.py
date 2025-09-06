@@ -6,57 +6,64 @@ from enum import Enum
 from typing import cast, TYPE_CHECKING
 from uuid import UUID
 
-from ..protocols import DataclassInstance
+from ..protocols import WillowDataclass
 
 if TYPE_CHECKING:
     from typing import Any
 
-    from ..types import Stack
+    from ..types import DictFactory, ListFactory, Member, Stack
 
 
 def serialize_obj(
-    obj: Any,
+    member: Member,
+    value: Any,
     stack: Stack,
+    *,
+    dict_factory: DictFactory = dict,
+    list_factory: ListFactory = list,
 ) -> Any:
     """
-    Recursively serialize an object to a JSON-compatible structure.
+    Serialize an object into a JSON-compatible structure recursively.
 
-    Handles dataclasses, lists, tuples, dicts, enums, datetime objects, and UUIDs.
-    Uses a stack to manage recursion without deep function calls.
+    Handles common Python types including dataclasses, lists, tuples, dicts,
+    Enums, datetime/date/time objects, and UUIDs. Uses a stack to avoid
+    deep recursion.
 
-    :param obj: The object to serialize.
-    :param stack: Stack used for recursive serialization.
-    :return: Serialized representation of the object.
+    :param member: The dataclass field or member being serialized.
+    :param value: The value to serialize.
+    :param stack: Stack used to track nested serialization tasks.
+    :param dict_factory: Factory function to create dictionaries.
+    :param list_factory: Factory function to create lists.
+    :return: Serialized representation suitable for JSON encoding.
     """
-    if is_dataclass(obj):
-        if hasattr(obj, "to_dict"):
-            return obj.to_dict()
-        elif hasattr(obj, "_asdict"):
-            return obj._asdict()
+    if is_dataclass(value):
+        if hasattr(value, "to_dict"):
+            return value.to_dict()
+        elif hasattr(value, "asdict"):
+            return value.asdict()
         else:
-            return asdict(cast(DataclassInstance, obj))
-    elif isinstance(obj, (list, tuple)):
-        items = list[Any]()
+            return asdict(cast(WillowDataclass, value))
+    elif isinstance(value, (list, tuple)):
+        items = list_factory()
 
-        for item in reversed(obj):
-            stack.append((item, items, "list_item"))
-
+        for item in reversed(value):
+            stack.append((member, item, items, "list_item", dict_factory, list_factory))
         return items
-    elif isinstance(obj, dict):
-        data = dict[str, Any]()
+    elif isinstance(value, dict):
+        data = dict_factory()
 
-        for k, v in obj.items():
-            stack.append((v, data, k))
+        for k, v in value.items():
+            stack.append((member, v, data, k, dict_factory, list_factory))
 
         return data
-    elif isinstance(obj, Enum):
-        return obj.value
-    elif isinstance(obj, (datetime, date, time)):
-        return obj.isoformat()
-    elif isinstance(obj, UUID):
-        return str(obj)
+    elif isinstance(value, Enum):
+        return value.value
+    elif isinstance(value, (datetime, date, time)):
+        return value.isoformat()
+    elif isinstance(value, UUID):
+        return str(value)
     else:
-        return obj
+        return value
 
 
 __all__ = ("serialize_obj",)

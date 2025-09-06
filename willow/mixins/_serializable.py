@@ -10,7 +10,8 @@ if TYPE_CHECKING:
     from json import JSONEncoder, JSONDecoder
     from typing import Any, Callable, ClassVar, Type
 
-    from ..protocols import DataclassInstance
+    from ..protocols import WillowDataclass
+    from ..types import DictFactory, ListFactory, MutableDict
 
 
 class Serializable(WillowMixin):
@@ -22,6 +23,7 @@ class Serializable(WillowMixin):
       - Supports class-level defaults via `__json_wrapper__` and `__inclusion__`.
       - Allows per-call overrides for JSON wrapper and inclusion rules.
       - Respects custom field-level serializers and deserializers.
+      - Fully supports nested dataclasses during serialization and deserialization.
 
     ClassVars:
       __json_wrapper__ : str | None
@@ -34,12 +36,12 @@ class Serializable(WillowMixin):
     __inclusion__: ClassVar[Include | None] = Include.ALWAYS
 
     @classmethod
-    def from_dict(cls, data: dict) -> DataclassInstance:
+    def from_dict(cls, data: dict) -> WillowDataclass:
         """
         Create an instance of the class from a dictionary.
 
-        Respects field metadata and type hints.
-        Fields marked with `willow.ignore=True` are skipped.
+        Fields marked with `willow.ignore=True` are skipped. Respects type hints
+        and nested dataclasses.
 
         :param data: Dictionary containing field values.
         :return: Instance populated from the dictionary.
@@ -58,9 +60,12 @@ class Serializable(WillowMixin):
         parse_int: Callable[[str], Any] | None = None,
         parse_constant: Callable[[str], Any] | None = None,
         object_hook_pairs: Callable[[list[tuple[Any, Any]]], Any] | None = None,
-    ) -> DataclassInstance:
+    ) -> WillowDataclass:
         """
         Create an instance from a JSON string.
+
+        Supports per-call wrapper and field inclusion control, as well as standard
+        JSON decoder options. Nested dataclasses are fully supported.
 
         :param s: JSON string, bytes, or bytearray.
         :param wrapper: Optional JSON wrapper key. Defaults to `__json_wrapper__`.
@@ -85,23 +90,49 @@ class Serializable(WillowMixin):
             object_hook_pairs=object_hook_pairs,
         )
 
-    def to_dict(self) -> dict:
+    def to_dict(
+        self,
+        *,
+        include: Include | None = None,
+        include_properties: bool = True,
+        include_private: bool = False,
+        dict_factory: DictFactory = dict,
+        list_factory: ListFactory = list,
+    ) -> MutableDict:
         """
         Serialize the instance to a dictionary.
 
-        Uses class-level inclusion rule `__inclusion__` by default,
-        but can be overridden by per-call logic if needed.
+        Uses class-level inclusion rule `__inclusion__` by default, but can be
+        overridden per-call. Nested dataclasses are fully serialized.
 
+        :param include: Optional inclusion rule for fields.
+        :param include_properties: Include properties in the output if True.
+        :param include_private: Include private attributes if True.
+        :param dict_factory: Callable to construct the resulting dictionary.
+        :param list_factory: Callable to construct lists in the dictionary.
         :return: Dictionary representation of the instance.
         """
-        include = getattr(self, "__inclusion__", Include.ALWAYS)
-        return to_dict(self, include)
+        if include is None:
+            include = getattr(type(self), "__inclusion__", Include.ALWAYS)
+
+        return to_dict(
+            self,
+            include,
+            include_properties=include_properties,
+            include_private=include_private,
+            dict_factory=dict_factory,
+            list_factory=list_factory,
+        )
 
     def to_json(
         self,
         *,
         wrapper: str | None = None,
-        include: Include = Include.ALWAYS,
+        include: Include | None = None,
+        include_properties: bool = True,
+        include_private: bool = False,
+        dict_factory: DictFactory = dict,
+        list_factory: ListFactory = list,
         skip_keys: bool = False,
         ensure_ascii: bool = True,
         check_circular: bool = True,
@@ -116,33 +147,40 @@ class Serializable(WillowMixin):
         """
         Serialize the instance to a JSON string.
 
-        Allows per-call control of:
-          - `wrapper`: JSON wrapper key, defaults to `__json_wrapper__`.
-          - `include`: Field inclusion rules, defaults to `__inclusion__`.
-
-        Supports additional standard JSON encoder arguments.
+        Allows per-call control of wrapper and inclusion. Respects nested dataclasses
+        and supports additional JSON encoder arguments.
 
         :param wrapper: Optional JSON wrapper key. Defaults to `__json_wrapper__`.
         :param include: Optional field inclusion rule. Defaults to `__inclusion__`.
+        :param include_properties: Include properties in the output if True.
+        :param include_private: Include private attributes if True.
+        :param dict_factory: Callable to construct the resulting dictionary.
+        :param list_factory: Callable to construct lists in the dictionary.
         :param skip_keys: Skip keys that cannot be serialized.
-        :param ensure_ascii: Escape non-ASCII characters.
+        :param ensure_ascii: Escape non-ASCII characters if True.
         :param check_circular: Check for circular references.
         :param allow_nan: Allow NaN, Infinity, -Infinity.
         :param json_cls: Optional JSON encoder class.
-        :param indent: Optional indentation for JSON.
-        :param separators: Optional key-value separators.
-        :param default: Callable for non-serializable objects.
-        :param sort_keys: Sort keys if True.
+        :param indent: Optional indentation for JSON output.
+        :param separators: Optional separators for JSON output.
+        :param default: Callable for objects not serializable by default.
+        :param sort_keys: Sort dictionary keys if True.
         :param kwargs: Additional keyword arguments for JSON encoder.
-        :return: JSON string representation.
+        :return: JSON string representation of the instance.
         """
         wrapper = wrapper or getattr(type(self), "__json_wrapper__")
-        include = include or getattr(type(self), "__inclusion__", Include.ALWAYS)
+
+        if include is None:
+            include = getattr(type(self), "__inclusion__", Include.ALWAYS)
 
         return to_json(
             self,
             include,
             wrapper=wrapper,
+            include_properties=include_properties,
+            include_private=include_private,
+            dict_factory=dict_factory,
+            list_factory=list_factory,
             skip_keys=skip_keys,
             ensure_ascii=ensure_ascii,
             check_circular=check_circular,

@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from ._willow_metadata import willow_metadata
+
 if TYPE_CHECKING:
     from dataclasses import Field
     from typing import Any
@@ -22,13 +24,13 @@ def resolve_field_key(
     :param data: Dictionary of data being deserialized.
     :return: The key to use from the dictionary for this field.
     """
-    cfg = field.metadata.get("json", {})
-    key = cfg.get("key")
+    metadata = willow_metadata(field, "json", {})
+    key: str | None = metadata.get("key")
 
     if key and key in data:
         return key
 
-    aliases = cfg.get("aliases", [])
+    aliases = metadata.get("aliases", [])
     if isinstance(aliases, str):
         aliases = [aliases]
 

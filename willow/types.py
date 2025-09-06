@@ -1,30 +1,33 @@
 from __future__ import annotations
 
-from typing import Any, TypeVar, TYPE_CHECKING
+from dataclasses import Field
+from typing import Any, Callable, MutableMapping, TypeVar
 
-if TYPE_CHECKING:
-    from .protocols import DataclassInstance
+from .protocols import WillowDataclass
 
+# Types representing dataclass members (fields or properties)
+Member = Field | property
 
-StackParent = list[Any] | dict[str, Any] | None
+# Standard mutable dictionary type
+MutableDict = MutableMapping[str, Any]
+
+# Factory callables for dictionaries and lists
+DictFactory = Callable[[], MutableDict]
+ListFactory = Callable[[], list[Any]]
+
+# Stack structures used for recursive serialization
+StackParent = list[Any] | MutableDict | None
 StackKey = str | Any | None
-Stack = list[tuple[Any, StackParent, StackKey]]
-"""
-Type alias representing the serialization/deserialization stack.
+Stack = list[tuple[Member, Any, StackParent, StackKey, DictFactory, ListFactory]]
 
-Each item is a tuple of:
-- current object being processed,
-- parent container (list, dict, or None),
-- key in the parent (str, Any, or None)
-"""
-
-TDataclassInstance = TypeVar("TDataclassInstance", bound=DataclassInstance)
-"""
-Type variable bound to any dataclass instance implementing the DataclassInstance
-protocol. Used for generic typing in functions that operate on dataclass instances.
-"""
+# Generic type for dataclass instances implementing WillowDataclass
+TWillowDataclass = TypeVar("TWillowDataclass", bound=WillowDataclass)
 
 __all__ = (
+    "DictFactory",
+    "ListFactory",
+    "Member",
+    "MutableDict",
     "Stack",
-    "TDataclassInstance",
+    "TWillowDataclass",
 )

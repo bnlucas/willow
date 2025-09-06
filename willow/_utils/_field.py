@@ -24,13 +24,17 @@ def field(
     **kwargs: Any,
 ):
     """
-    Custom dataclass field wrapper that extends `dataclasses.field`.
+    Custom dataclass field wrapper that extends `dataclasses.field` with
+    Willow-specific features.
 
-    Adds support for:
-        - JSON serialization metadata (`json`)
-        - Field validation (`validator`)
-        - Allowing None values (`allow_none`)
-        - Arbitrary Willow-specific metadata (`willow`)
+    Features:
+      - JSON serialization metadata (`json`) for integration with Serializable.
+      - Field validation (`validator`) to enforce constraints.
+      - Optional allowance of None values (`allow_none`).
+      - Supports arbitrary Willow-specific metadata (`willow`) for future
+        extensions or custom behavior.
+      - Fully compatible with standard dataclass arguments (`default`, `init`,
+        `repr`, `hash`, `compare`, `metadata`).
 
     :param default: Default value for the field.
     :param default_factory: Factory function to generate default values.
@@ -39,24 +43,21 @@ def field(
     :param hash: Include in the generated __hash__ method.
     :param compare: Include in the generated comparison methods.
     :param metadata: Additional metadata dictionary.
-    :param json: Optional JSON-related metadata to store in `metadata['json']`.
+    :param json: Optional JSON-related metadata stored under
+           `metadata['willow']['json']`.
     :param validator: Optional callable to validate field values.
     :param allow_none: If True, allow the field to be None.
-    :param willow: Optional dictionary for Willow-specific metadata.
+    :param willow: Optional dictionary for additional Willow-specific metadata.
     :param kwargs: Additional keyword arguments passed to `dataclasses.field`.
-    :return: A `dataclasses.Field` object with extended metadata.
+    :return: A `dataclasses.Field` object enhanced with Willow metadata.
     """
     metadata = metadata or {}
-    metadata["allow_none"] = allow_none
 
-    if json:
-        metadata["json"] = json
-
-    if validator:
-        metadata["validator"] = validator
-
-    if willow:
-        metadata["willow"] = willow
+    metadata["willow"] = willow or {
+        "json": json or {},
+        "allow_none": allow_none,
+        "validator": validator,
+    }
 
     args: dict[str, Any] = dict(
         init=init,
